@@ -23,6 +23,7 @@ defmodule Gossip do
     Enum.each(1..numNodes,
   end
 end
+
 defmodule GossipProtocol do
   use GenServer
 
@@ -52,6 +53,19 @@ defmodule GossipProtocol do
     end
 
     def handle_cast({:start_gossip}, state) do
+      {bool , neighbors_list} -> state
+      if bool == true do
+        random_number = :rand.uniform(len(neighbors_list))
+        random_neighbour = Enum.at(neighbors_list, random_number)
+        send_gossip_to_neighbor()
+      else
+
+      end
+
+    def handle_info({:send_gossip}, state) do
+
+
+    end
 
     end
 end
