@@ -18,14 +18,11 @@ defmodule Gossip do
 
     end
   end
+
+  def generate_full_nodes_topology(numNodes) do
+    Enum.each(1..numNodes,
+  end
 end
-
-def generate_full_nodes_topology(numNodes) do
-  Enum.each(1..numNodes,
-            fn(x) -> GenServer.start_link(GossipProtocol,  ) end)
-
-end
-
 defmodule GossipProtocol do
   use GenServer
 
