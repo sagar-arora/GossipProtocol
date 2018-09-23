@@ -24,7 +24,6 @@ defmodule Gossip do
                             fn x -> GenServer.start_link(GossipProtocol, [numNodes])
                             end
                             )
-    IO.puts("here3")
     nodes_list = Enum.map(ok_nodes_tuples_list, fn ({x,y}) -> y end)
     IO.puts(inspect(nodes_list))
 
@@ -32,7 +31,6 @@ defmodule Gossip do
                     fn (x, acc) -> Map.put(acc, x, list_generate_helper(nodes_list, x))
                     end
                     )
-  #  IO.puts(inspect(map))
   end
 
   def generate_rand2D_topology(numNodes) do
@@ -69,15 +67,6 @@ defmodule Gossip do
                                   end
                     )
    IO.puts(inspect(map))
-
-#  Enum.reduce(succeding_pid_list, %{}, fn({x,list}, acc) ->
-#                                               )
-
-#    Enum.filter(Enumerable.t(), (any() -> as_boolean(term())))
-
-
-  #  IO.puts(inspect(generate_x_y))
-
   end
 
  ## check if the distance between point is in the range 0.1
@@ -119,11 +108,87 @@ def generate_3D_grid_nodes_topology(numNodes) do
 
 end
 
+# Line Topology
+# Processes should be arranged in a straight line
 def generate_line_topology(numNodes) do
+  process_ok_tuples_list = Enum.map(1..numNodes,
+                          fn x -> GenServer.start_link(GossipProtocol, [numNodes])
+                          end
+                          )
+  nodes_list = Enum.map(process_ok_tuples_list, fn ({x,y}) -> y end)
 
+  if numNodes == 2 do
+    [first_pid | second_pid] = nodes_list
+    map = %{}
+    map = Map.put(map, first_pid, [second_pid])
+    map = Map.put(map, second_pid, [first_pid])
+    map
+  else
+    map = Enum.reduce(nodes_list, %{}, fn (x, acc) ->
+                                  Map.put(acc,
+                                  x ,
+                                  Enum.concat(get_element_before(nodes_list, x) , get_element_after(nodes_list, x))
+                                  )
+                                end)
+    map
+
+  end
 end
 
-#def line_generator_helper([head,list], element)
+## Imperfect line: Line arrangement but one random other neighboor is
+## selected from the list of all actors
+def generate_imperfect_line_topology(numNodes) do
+  process_ok_tuples_list = Enum.map(1..numNodes,
+                          fn x -> GenServer.start_link(GossipProtocol, [numNodes])
+                          end
+                          )
+  nodes_list = Enum.map(process_ok_tuples_list, fn ({x,y}) -> y end)
+
+  if numNodes == 2 do
+    [first_pid | second_pid] = nodes_list
+    map = %{}
+    map = Map.put(map, first_pid, [second_pid])
+    map = Map.put(map, second_pid, [first_pid])
+    map
+  else
+    map = Enum.reduce(nodes_list, %{}, fn (x, acc) ->
+                                  Map.put( acc, x,
+                                  Enum.concat( [Enum.random(nodes_list)],
+                                  Enum.concat(get_element_before(nodes_list, x),
+                                  get_element_after(nodes_list, x))
+                                  )
+                                )
+                                end)
+    map
+  end
+end
+
+  def get_element_before([element| tail], element) do
+    []
+  end
+
+
+def get_element_before([head | tail], element) do
+    [head1 | tail1] = tail
+    if head1 == element do
+      [head]
+    else
+      get_element_before(tail, element)
+    end
+end
+
+
+  def get_element_after([element | []], element) do
+    []
+  end
+  def get_element_after([head | tail], element) do
+    [head1 | tail1] = tail
+    if head == element do
+      [head1]
+    else
+      get_element_after(tail, element)
+    end
+  end
 
 end
 
@@ -131,8 +196,8 @@ defmodule GossipProtocol do
   use GenServer
 
   def start_link(numNodes) do
-    use :math
-    {numRound, _} = Integer.parse(Integer.to_string((:math.log2(numNodes))))
+    import :math
+    {numRound, _} = Integer.parse(Integer.to_string((log2(numNodes))))
     IO.puts("Here2")
     GenServer.start_link(__MODULE__, {false, [], numRound})
   end
@@ -142,7 +207,7 @@ defmodule GossipProtocol do
     GenServer.cast(process_id, {:add_neighbors, neighbors_list})
   end
 
-  ## TODO: each actor on its end run the GossipProtocol
+  ## Each actor on its end run the GossipProtocol
   def start_gossip_protocol(process_id)  do
     GenServer.cast(process_id, {:start_gossip})
   end
@@ -160,8 +225,7 @@ defmodule GossipProtocol do
 
     def handle_cast({:start_gossip}, state) do
       {knows_gossip , neighbors_list, numRound} = state
-      # if bool is true that is the node knows the gossip and can start spreading
-      # gossip itself
+      # if bool is true that is the node knows the gossip and can start spreading gossip
       if knows_gossip == true do
         random_number = :rand.uniform(length(neighbors_list))
         random_neighbour = Enum.at(neighbors_list, random_number)
