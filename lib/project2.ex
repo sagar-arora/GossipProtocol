@@ -15,13 +15,43 @@ defmodule Gossip do
   def main(args) do
     case args do
       [numNodes, "full", "gossip"] ->
+        nodes_topology_map = generate_full_nodes_topology(numNodes)
+        Enum.each(nodes_topology_map, fn {x,y} ->
+                                      GossipProtocol.add_neighbours(x,y) end)
+        # Pick a random node and tell them gossip
+        {x,y} = Enum.random(nodes_topology_map)
+        IO.puts("#{inspect(x)} knows the GOSSIP")
+        GossipProtocol.tell_gossip(x)
+        Enum.each(nodes_topology_map, fn {x,y} ->
+                                      GossipProtocol.start_gossip_protocol(x)
+                                      end)
+        receiver()
+       [numNodes, "rand2D", "gossip"] ->
+        nodes_topology_map = generate_rand2D_topology(numNodes)
+        #IO.puts("printing map #{nodes_topology_map}")
+        Enum.each(nodes_topology_map, fn {x, y} ->
+                                        GossipProtocol.add_neighbours(x,y) end)
+        # Pick a random node and tell them gossip
+        {x,y} = Enum.random(nodes_topology_map)
+        IO.puts("#{inspect(x)} knows the GOSSIP")
+        GossipProtocol.tell_gossip(x)
+        Enum.each(nodes_topology_map, fn {x,y} ->
+                                      GossipProtocol.start_gossip_protocol(x)
+                                      end)
+    end
 
+
+  end
+
+  def receiver() do
+    receive do
+      {:finished, pid} -> GossipProtocol.stop(pid)
     end
   end
 
   def generate_full_nodes_topology(numNodes) do
     ok_nodes_tuples_list = Enum.map(1..numNodes,
-                            fn x -> GenServer.start_link(GossipProtocol, [numNodes])
+                            fn x -> GossipProtocol.start_link(numNodes, self())
                             end
                             )
     nodes_list = Enum.map(ok_nodes_tuples_list, fn ({x,y}) -> y end)
@@ -35,12 +65,12 @@ defmodule Gossip do
 
   def generate_rand2D_topology(numNodes) do
     process_ok_tuples_list = Enum.map(1..numNodes,
-                            fn x -> GenServer.start_link(GossipProtocol, [numNodes])
+                            fn x -> GossipProtocol.start_link(numNodes, self())
                             end
                             )
 
     nodes_list = Enum.map(process_ok_tuples_list, fn ({x,y}) -> y end)
-
+    IO.puts(inspect(nodes_list))
     generate_x_y = Enum.reduce(nodes_list, %{},
                             fn (x, acc) -> Map.put(acc, x,
                              {:rand.uniform(10)/10, :rand.uniform(10)/10})
@@ -50,9 +80,10 @@ defmodule Gossip do
                                   {x , list_generate_helper(nodes_list, x)}
                                   end
                                 )
+    IO.puts(inspect(succeding_pid_list))
     map = Enum.reduce(succeding_pid_list , %{},
                                   fn ({x, succeding_pid_list_of_x}, acc) ->
-                                    IO.puts("pid= #{inspect(x)} and {x,y} = #{inspect(Map.fetch(generate_x_y, x))}")
+                                    IO.puts("pid= #{inspect(x)} and {x,y} = #{inspect(Map.get(generate_x_y, x))}")
                                     new_list = Enum.filter(succeding_pid_list_of_x,
                                               fn (y) ->
                                               #  { _ , point1} = Map.fetch(generate_x_y, x)
@@ -66,7 +97,7 @@ defmodule Gossip do
                                     Map.put(acc, x, new_list)
                                   end
                     )
-   IO.puts(inspect(map))
+   map
   end
 
  ## check if the distance between point is in the range 0.1
@@ -106,13 +137,14 @@ defmodule Gossip do
 
 def generate_3D_grid_nodes_topology(numNodes) do
 
+
 end
 
 # Line Topology
 # Processes should be arranged in a straight line
 def generate_line_topology(numNodes) do
   process_ok_tuples_list = Enum.map(1..numNodes,
-                          fn x -> GenServer.start_link(GossipProtocol, [numNodes])
+                          fn x -> GossipProtocol.start_link(numNodes)
                           end
                           )
   nodes_list = Enum.map(process_ok_tuples_list, fn ({x,y}) -> y end)
@@ -139,7 +171,7 @@ end
 ## selected from the list of all actors
 def generate_imperfect_line_topology(numNodes) do
   process_ok_tuples_list = Enum.map(1..numNodes,
-                          fn x -> GenServer.start_link(GossipProtocol, [numNodes])
+                          fn x -> GossipProtocol.start_link(numNodes)
                           end
                           )
   nodes_list = Enum.map(process_ok_tuples_list, fn ({x,y}) -> y end)
@@ -195,14 +227,13 @@ end
 defmodule GossipProtocol do
   use GenServer
 
-  def start_link(numNodes) do
+  def start_link(numNodes, parent_id) do
     import :math
-    {numRound, _} = Integer.parse(Integer.to_string((log2(numNodes))))
-    IO.puts("Here2")
-    GenServer.start_link(__MODULE__, {false, [], numRound})
+    {numRound, _} = Integer.parse(Float.to_string((log2(numNodes))))
+    GenServer.start_link(__MODULE__, {false, [], numRound, parent_id})
   end
 
-  ## TODO: add neighbors based on the topology
+  ## add neighbors based on the topology
   def add_neighbours(process_id, neighbors_list) do
     GenServer.cast(process_id, {:add_neighbors, neighbors_list})
   end
@@ -212,36 +243,70 @@ defmodule GossipProtocol do
     GenServer.cast(process_id, {:start_gossip})
   end
 
+  def tell_gossip(process_id) do
+    GenServer.cast(process_id, {:tell_gossip})
+  end
   # Server @callback function_name() :: type
     def init(state) do
+      IO.puts(inspect(state))
       {:ok, state}
     end
 
+
     def handle_cast({:add_neighbors, neighbors_list}, state) do
-      {bool , initial_neighbors_list, numRound} = state
-      new_state = {bool, [initial_neighbors_list | neighbors_list]}
-      {:no_reply, new_state}
+      {bool , initial_neighbors_list, numRound, parent_id} = state
+      new_state = {bool, Enum.concat(initial_neighbors_list , neighbors_list), numRound, parent_id}
+      {:noreply, new_state}
+    end
+
+    def handle_cast({:tell_gossip}, state) do
+      {bool , initial_neighbors_list, numRound, parent_id} = state
+      new_state = {true, initial_neighbors_list, numRound, parent_id}
+      {:noreply, new_state}
     end
 
     def handle_cast({:start_gossip}, state) do
-      {knows_gossip , neighbors_list, numRound} = state
+      {knows_gossip , neighbors_list, numRound, parent_id} = state
       # if bool is true that is the node knows the gossip and can start spreading gossip
       if knows_gossip == true do
-        random_number = :rand.uniform(length(neighbors_list))
-        random_neighbour = Enum.at(neighbors_list, random_number)
-        send(random_neighbour, {:send_gossip})
+        #random_number = :rand.uniform(length(neighbors_list))
+        random_neighbour = Enum.random(neighbors_list)
+        IO.puts("#{inspect(random_neighbour)} chosen by #{inspect(self())} ")
+        send(random_neighbour, {:send_gossip_to_neighbor})
+        start_gossip_protocol(self())
       # else wait for the gossip to come
-      else
-
       end
+        start_gossip_protocol(self())
+        {:noreply, state}
     end
 
-    def handle_info({:send_gossip}, state) do
-      {bool, initial_neighbors_list, numRound} = state
+    def handle_info({:send_gossip_to_neighbor}, state) do
+      {bool, initial_neighbors_list, numRound, parent_id} = state
       if numRound == 0 do
-        #  stop(server)
+        #IO.puts("")
+        IO.puts("stop the process #{inspect(self())} and state during ending #{inspect(state)}")
+        Process.exit(self(), :finished)
+        #GossipProtocol.stop()
+        #terminate(:finished, state)
+        #stop(self(), :normal, :infinity) #reason \\ :normal, timeout \\ :infinity)
+        #{:stop, :shutdown, state}
+          #stop(server)
+        #send(parent_id, {:finished, self()})
       end
-      new_state = {bool, initial_neighbors_list, numRound-1}
-      {:no_reply, new_state}
+      new_state = {true, initial_neighbors_list, numRound-1, parent_id}
+      {:noreply, new_state}
+    end
+
+    def stop(pid) do
+      GenServer.cast(pid, :stop)
+    end
+
+    def handle_cast(:stop, status) do
+      {:stop, :normal, status}
+    end
+
+    def terminate(reason, _status) do
+      IO.puts "Asked to stop because #{inspect reason}"
+      :ok
     end
 end
