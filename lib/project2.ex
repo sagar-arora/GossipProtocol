@@ -2,20 +2,10 @@ defmodule Gossip do
   @moduledoc """
   Documentation for Gossip.
   """
-
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> Gossip.hello()
-      :world
-
-  """
   def main(args) do
     case args do
       [numNodes, "full", "gossip"] ->
-        nodes_topology_map = generate_full_nodes_topology(numNodes)
+        nodes_topology_map = generate_full_nodes_topology(numNodes, :gossip)
         Enum.each(nodes_topology_map, fn {x,y} ->
                                       GossipProtocol.add_neighbours(x,y) end)
         # Pick a random node and tell them gossip
@@ -25,9 +15,20 @@ defmodule Gossip do
         Enum.each(nodes_topology_map, fn {x,y} ->
                                       GossipProtocol.start_gossip_protocol(x)
                                       end)
-        receiver()
+        #receiver()
+        [numNodes, "full", "pushsum"] ->
+          start_time = :erlang.system_time / 1.0e6 |> round
+          nodes_topology_map = generate_full_nodes_topology(numNodes, :pushsum)
+          Enum.each(nodes_topology_map, fn {x,y} ->
+                                        PushSum.add_neighbours(x,y) end)
+          # Pick a random node and tell them gossip
+          {x,y} = Enum.random(nodes_topology_map)
+          #IO.puts("#{inspect(x)} knows the GOSSIP")
+          PushSum.start_push_sum(x)
+
+
        [numNodes, "rand2D", "gossip"] ->
-        nodes_topology_map = generate_rand2D_topology(numNodes)
+        nodes_topology_map = generate_rand2D_topology(numNodes,:gossip)
         #IO.puts("printing map #{nodes_topology_map}")
         Enum.each(nodes_topology_map, fn {x, y} ->
                                         GossipProtocol.add_neighbours(x,y) end)
@@ -38,6 +39,35 @@ defmodule Gossip do
         Enum.each(nodes_topology_map, fn {x,y} ->
                                       GossipProtocol.start_gossip_protocol(x)
                                       end)
+      [numNodes, "rand2D", "pushsum"] ->
+        nodes_topology_map = generate_rand2D_topology(numNodes,:pushsum)
+                                       #IO.puts("printing map #{nodes_topology_map}")
+        Enum.each(nodes_topology_map, fn {x, y} -> GossipProtocol.add_neighbours(x,y) end)
+                                       # Pick a random node and tell them gossip
+        {x,y} = Enum.random(nodes_topology_map)
+        PushSum.start_push_sum(x)
+       [numNodes, "line", "gossip"] ->
+         nodes_topology_map = generate_line_topology(numNodes, :gossip)
+         IO.puts("printing map #{inspect nodes_topology_map}")
+         Enum.each(nodes_topology_map, fn {x, y} ->
+                                         GossipProtocol.add_neighbours(x,y) end)
+         # Pick a random node and tell them gossip
+         {x,y} = Enum.random(nodes_topology_map)
+         IO.puts("#{inspect(x)} knows the GOSSIP")
+         GossipProtocol.tell_gossip(x)
+         Enum.each(nodes_topology_map, fn {x,y} ->
+                                       GossipProtocol.start_gossip_protocol(x)
+                                       end)
+                                       [numNodes, "line", "pushsum"] ->
+                                         #start_time = :erlang.system_time / 1.0e6 |> round
+                                         nodes_topology_map = generate_line_topology(numNodes, :pushsum)
+                                         Enum.each(nodes_topology_map, fn {x,y} ->
+                                                                       PushSum.add_neighbours(x,y) end)
+                                         # Pick a random node and tell them gossip
+                                         {x,y} = Enum.random(nodes_topology_map)
+                                         #IO.puts("#{inspect(x)} knows the GOSSIP")
+                                         PushSum.start_push_sum(x)
+
     end
 
 
@@ -49,11 +79,8 @@ defmodule Gossip do
     end
   end
 
-  def generate_full_nodes_topology(numNodes) do
-    ok_nodes_tuples_list = Enum.map(1..numNodes,
-                            fn x -> GossipProtocol.start_link(numNodes, self())
-                            end
-                            )
+  def generate_full_nodes_topology(numNodes, protocol) do
+    ok_nodes_tuples_list = create_server_list(numNodes, protocol)
     nodes_list = Enum.map(ok_nodes_tuples_list, fn ({x,y}) -> y end)
     IO.puts(inspect(nodes_list))
 
@@ -63,12 +90,24 @@ defmodule Gossip do
                     )
   end
 
-  def generate_rand2D_topology(numNodes) do
-    process_ok_tuples_list = Enum.map(1..numNodes,
-                            fn x -> GossipProtocol.start_link(numNodes, self())
-                            end
-                            )
+  def create_server_list(numNodes, :gossip) do
+    nodes_list = Enum.map(1..numNodes, fn x -> GossipProtocol.start_link(numNodes, self())
+                          end
+                          )
+    nodes_list
+  end
 
+  def create_server_list(numNodes, :pushsum) do
+    nodes_list = Enum.map(1..numNodes,
+                          fn x -> PushSum.start_link(numNodes, x, self())
+                          end
+                          )
+    nodes_list
+  end
+
+
+  def generate_rand2D_topology(numNodes, protocol) do
+    process_ok_tuples_list = create_server_list(numNodes, protocol)
     nodes_list = Enum.map(process_ok_tuples_list, fn ({x,y}) -> y end)
     IO.puts(inspect(nodes_list))
     generate_x_y = Enum.reduce(nodes_list, %{},
@@ -142,11 +181,8 @@ end
 
 # Line Topology
 # Processes should be arranged in a straight line
-def generate_line_topology(numNodes) do
-  process_ok_tuples_list = Enum.map(1..numNodes,
-                          fn x -> GossipProtocol.start_link(numNodes)
-                          end
-                          )
+def generate_line_topology(numNodes, protocol) do
+  process_ok_tuples_list = create_server_list(numNodes, protocol)
   nodes_list = Enum.map(process_ok_tuples_list, fn ({x,y}) -> y end)
 
   if numNodes == 2 do
@@ -169,11 +205,8 @@ end
 
 ## Imperfect line: Line arrangement but one random other neighboor is
 ## selected from the list of all actors
-def generate_imperfect_line_topology(numNodes) do
-  process_ok_tuples_list = Enum.map(1..numNodes,
-                          fn x -> GossipProtocol.start_link(numNodes)
-                          end
-                          )
+def generate_imperfect_line_topology(numNodes, protocol) do
+  process_ok_tuples_list = create_server_list(numNodes, protocol)
   nodes_list = Enum.map(process_ok_tuples_list, fn ({x,y}) -> y end)
 
   if numNodes == 2 do
@@ -280,7 +313,7 @@ defmodule GossipProtocol do
         {:noreply, state}
     end
 
-    def handle_info({:send_gossip_to_neighbor}, state) do
+      def handle_info({:send_gossip_to_neighbor}, state) do
       {bool, initial_neighbors_list, numRound, parent_id} = state
       if numRound == 0 do
         #IO.puts("")
@@ -309,4 +342,73 @@ defmodule GossipProtocol do
       IO.puts "Asked to stop because #{inspect reason}"
       :ok
     end
+end
+
+defmodule PushSum do
+  use GenServer
+  @accuracy :math.pow(10, -10)
+
+  def start_link(numNodes, initial_sum_val, parent_id) do
+    import :math
+    #{numRound, _} = Integer.parse(Float.to_string((log2(numNodes))))
+    initial_weight_val = 1
+    numRound = 0
+    GenServer.start_link(__MODULE__, {{initial_sum_val, initial_weight_val}, [], numRound, parent_id})
+  end
+
+  def init(state) do
+    #IO.puts(inspect(state))
+    {:ok, state}
+  end
+
+  def get_sum_weight_tuple(pid) do
+    GenServer.call(pid, {:get_sum_weight_tuple})
+  end
+
+  ## add neighbors based on the topology
+  def add_neighbours(process_id, neighbors_list) do
+    GenServer.cast(process_id, {:add_neighbors, neighbors_list})
+  end
+
+  def handle_cast({:add_neighbors, neighbors_list}, state) do
+    {bool , initial_neighbors_list, numRound, parent_id} = state
+    new_state = {bool, Enum.concat(initial_neighbors_list , neighbors_list), numRound, parent_id}
+    {:noreply, new_state}
+  end
+
+  def start_push_sum(pid) do
+    GenServer.cast(pid, {:start_push_sum})
+  end
+
+  def handle_cast({:get_sum_weight_tuple}, _from, state) do
+    {sum_weight_tuple , initial_neighbors_list, numRound, parent_id} = state
+    {:reply, state}
+  end
+
+  def handle_cast({:start_push_sum}, state) do
+    {{sum, weight} , neighbors_list, numRound, parent_id} = state
+    random_neighbour = Enum.random(neighbors_list)
+    half_sum = sum/2
+    half_weight = weight/2
+    send(random_neighbour, {:send_sum_weight_tuple, {half_sum, half_weight}})
+    new_state = {{half_sum , half_weight} , neighbors_list, numRound, parent_id}
+    {:noreply, new_state}
+  end
+
+  def handle_info( {:send_sum_weight_tuple, {half_sum, half_weight}}, state) do
+    {{sum , weight} , initial_neighbors_list, numRound, parent_id} = state
+    new_sum = sum + half_sum
+    new_weight = weight + half_weight
+    old_ratio = sum / weight
+    new_ratio = new_sum / new_weight
+    diff = (old_ratio - new_ratio)*(old_ratio - new_ratio) |> :math.sqrt
+    if( diff < @accuracy) do
+      IO.puts("The PathSum converged on the avg #{new_ratio}")
+      Process.exit(self(), :finished)
+    end
+    new_state = {{new_sum , new_weight} , initial_neighbors_list, numRound, parent_id}
+    start_push_sum(self())
+    {:noreply, new_state}
+  end
+
 end
