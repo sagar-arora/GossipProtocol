@@ -228,6 +228,140 @@ def generate_imperfect_line_topology(numNodes, protocol) do
   end
 end
 
+  def generate_torus(numNodes, protocol) do
+    process_ok_tuples_list = create_server_list(numNodes, protocol)
+    nodes_list = Enum.map(process_ok_tuples_list, fn ({x,y}) -> y end)
+    dim = round(:math.ceil(:math.pow(numNodes, 1.0/3)))
+    IO.puts(dim)
+    grid2D = Enum.chunk_every(nodes_list, dim)
+    IO.puts(inspect(grid2D))
+    grid3D = Enum.chunk_every(nodes_list, dim*dim)
+    IO.puts(inspect(grid3D))
+    map = Enum.reduce(0..(dim*dim*dim-1), %{}, fn (x, acc) ->
+        i = round(:math.floor(x/dim)); j = rem(x,dim); k = round(:math.floor(x/(dim*dim)))
+        IO.puts("process = #{x} i = #{i}, j = #{j}, k = #{k}")
+        x_left = if j-1 < 0 do j-1 + length(Enum.at(grid2D, i)) else j-1 end
+        x_right = if j+1 >= length(Enum.at(grid2D, i)) do j+1 - length(Enum.at(grid2D, i)) else j+1 end
+        y_top = if i-1 < 0 do i - 1 + length(grid2D) else i-1 end
+        y_bottom = if i+1 >= length(grid2D) do i+1-length(grid2D) else i+1 end
+        z_top = if k-1 < 0 do k-1 + length(grid3D) else k-1 end
+        z_bottom = if k+1 >= length(grid3D) do k+1-length(grid3D) else k+1 end
+        IO.puts(inspect([y_top, y_bottom, z_top, z_bottom, x_left, x_right]))
+        Map.put(acc, Enum.at(nodes_list, x),
+          _2DHelper([y_top, y_bottom, z_top, z_bottom, x_left, x_right], i, j, k, dim, grid2D, grid3D)
+      )
+    end)
+    map
+  end
+
+  def _2DHelper([y_top, y_bottom, z_top, z_bottom, left, right], i, j, k, dim,  grid2D, grid3D) do
+    y_top    = Enum.at(Enum.at(grid2D, y_top), j)
+    y_bottom = Enum.at(Enum.at(grid2D, y_bottom), j)
+    z_top = Enum.at(Enum.at(grid3D, z_top), i*dim + j)
+    z_bottom = Enum.at(Enum.at(grid3D, z_bottom), i*dim + j)
+    x_left   = Enum.at(Enum.at(grid2D, i), left)
+    x_right  = Enum.at(Enum.at(grid2D, i), right)
+
+    #filtering out nil nodes
+    Enum.reduce([y_top, y_bottom, z_top, z_bottom, x_left, x_right], [], fn(x, l) ->
+        if x == nil do l else [x | l] end
+    end)
+end
+
+def generate_3D(numNodes, protocol) do
+   dim = round(:math.ceil(:math.pow(numNodes, 1.0/3)))
+   process_ok_tuples_list = create_server_list(numNodes, protocol)
+   nodes_list = Enum.map(process_ok_tuples_list, fn ({x,y}) -> y end)
+
+   dim = round(:math.floor(:math.pow(numNodes, 1.0/3)))
+   IO.puts(dim)
+   grid2D = Enum.chunk_every(nodes_list, dim*dim)
+   IO.puts(inspect(grid2D))
+   grid = Enum.map(grid2D, fn x -> Enum.chunk_every(x, dim) end)
+   map1 =
+     Enum.map(0..(dim-1), fn x ->
+       k = rem(x,dim)
+     Enum.reduce(0..(dim*dim-1), %{}, fn (x, acc) ->
+       i = round(:math.floor(x/dim)); j = rem(x, dim);
+       IO.puts("process = #{x} i = #{i}, j = #{j}, k = #{k}")
+       x_left = j-1
+       x_right = j+1
+       y_top = i-1
+       y_bottom = i+1
+       z_top = k-1
+       z_bottom = k+1
+       IO.puts(inspect([y_top, y_bottom, z_top, z_bottom, x_left, x_right]))
+       final_list = _2DHelper1([y_top, y_bottom, z_top, z_bottom, x_left, x_right], i, j, k, grid);
+       IO.puts(inspect(final_list))
+       Map.put(acc, Enum.at(nodes_list, x),
+       final_list
+      )
+   end)
+ end)
+end
+
+def _2DHelper1([y_top, y_bottom, z_top, z_bottom, x_left, x_right], i, j, k, grid) do
+  y_top = if y_top >= 0 do  Enum.at(Enum.at(Enum.at(grid, k), y_top), j) else nil end
+  IO.puts("y_top #{inspect y_top}")
+  y_bottom = if y_bottom <= length(Enum.at(grid, k)) - 1 do Enum.at(Enum.at(Enum.at(grid, k), y_bottom), j) else nil end
+  IO.puts("y_bottom #{inspect(y_bottom)}")
+  z_top = if z_top >= 0 do Enum.at(Enum.at(Enum.at(grid, z_top), i),j) else nil end
+  IO.puts("z_top #{inspect z_top}")
+  z_bottom = if z_bottom <= length(grid) - 1 do Enum.at(Enum.at(Enum.at(grid, z_bottom), i),j) else nil end
+  IO.puts("z_bottom #{inspect z_bottom}")
+  x_left   = if x_left >= 0 do Enum.at(Enum.at(Enum.at(grid, k), i), x_left) else nil end
+  IO.puts("x_left #{inspect x_left}")
+  x_right  = if x_right <= length(Enum.at(Enum.at(grid, k), i)) - 1 do Enum.at(Enum.at(Enum.at(grid, k), i), x_right)  else nil end
+  IO.puts("x_right #{inspect x_right}")
+  #filtering out nil nodes
+  Enum.reduce([y_top, y_bottom, z_top, z_bottom, x_left, x_right], [], fn(x, l) ->
+      if x == nil do l else [x | l] end
+  #IO.puts(inspect(final_list))
+  end)
+end
+
+def generate_3D_grid(numNodes,protocol ) do
+  process_ok_tuples_list = create_server_list(numNodes, protocol)
+  nodes_list = Enum.map(process_ok_tuples_list, fn ({x,y}) -> y end)
+
+  dim = round(:math.ceil(:math.pow(numNodes, 1.0/3)))
+  #IO.puts("dim #{dim}")
+  #grid2D = Enum.chunk_every(nodes_list, dim*dim)
+  #IO.puts(inspect(grid2D))
+  #row = Enum.chunk_every(grid2D, dim)
+  #IO.puts(inspect(row))
+
+  map1 = Enum.reduce(0..dim-1, %{}, fn(i,acc) ->
+          Enum.reduce(0..dim-1, acc, fn(row,acc) ->
+            Enum.reduce(0..dim-1, acc, fn(col,acc) ->
+                {:ok, pid} = GossipProtocol.start_link(numNodes, self())
+                Map.put(acc,{i,row,col},pid)
+        end)
+     end)
+  end)
+IO.inspect( map1)
+  map2 = Enum.reduce(map1, %{}, fn ({{x,y,z}, pid}, acc) ->
+                          list = []
+                            list = Enum.concat(list,[Map.get(map1,{x+1, y, z})])
+                            list = Enum.concat(list,[Map.get(map1,{x-1, y, z})])
+                            list = Enum.concat(list,[Map.get(map1,{x, y+1, z})])
+                            list = Enum.concat(list,[Map.get(map1, {x, y-1, z})])
+                            list = Enum.concat(list,[Map.get(map1, {x, y, z+1})])
+                            list = Enum.concat(list,[Map.get(map1, {x, y, z-1})])
+                            list = Enum.filter(list, & !is_nil(&1))
+                            Map.put(acc, pid, list)
+              end)
+  map2
+end
+
+def check_neighbors(x,y,z, dim) do
+  if x < dim and y < dim and z < dim do
+    true
+  end
+end
+
+
+
   def get_element_before([element| tail], element) do
     []
   end
