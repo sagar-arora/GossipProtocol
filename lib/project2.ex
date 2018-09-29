@@ -3,8 +3,11 @@ defmodule Gossip do
   Documentation for Gossip.
   """
   def main(args) do
+
     case args do
       [numNodes, "full", "gossip"] ->
+        start_time = :erlang.system_time / 1.0e6 |> round
+        #IO.puts("#{start_time}")
         nodes_topology_map = generate_full_nodes_topology(numNodes, :gossip)
         Enum.each(nodes_topology_map, fn {x,y} ->
                                       GossipProtocol.add_neighbours(x,y) end)
@@ -15,7 +18,7 @@ defmodule Gossip do
         Enum.each(nodes_topology_map, fn {x,y} ->
                                       GossipProtocol.start_gossip_protocol(x)
                                       end)
-        #receiver()
+        receiver(0, numNodes, start_time)
         [numNodes, "full", "pushsum"] ->
           start_time = :erlang.system_time / 1.0e6 |> round
           nodes_topology_map = generate_full_nodes_topology(numNodes, :pushsum)
@@ -28,6 +31,7 @@ defmodule Gossip do
 
 
        [numNodes, "rand2D", "gossip"] ->
+         start_time = :erlang.system_time / 1.0e6 |> round
         nodes_topology_map = generate_rand2D_topology(numNodes,:gossip)
         #IO.puts("printing map #{nodes_topology_map}")
         Enum.each(nodes_topology_map, fn {x, y} ->
@@ -39,7 +43,9 @@ defmodule Gossip do
         Enum.each(nodes_topology_map, fn {x,y} ->
                                       GossipProtocol.start_gossip_protocol(x)
                                       end)
+        receiver(0, numNodes, start_time)
       [numNodes, "rand2D", "pushsum"] ->
+        start_time = :erlang.system_time / 1.0e6 |> round
         nodes_topology_map = generate_rand2D_topology(numNodes,:pushsum)
                                        #IO.puts("printing map #{nodes_topology_map}")
         Enum.each(nodes_topology_map, fn {x, y} -> GossipProtocol.add_neighbours(x,y) end)
@@ -47,6 +53,7 @@ defmodule Gossip do
         {x,y} = Enum.random(nodes_topology_map)
         PushSum.start_push_sum(x)
        [numNodes, "line", "gossip"] ->
+         start_time = :erlang.system_time / 1.0e6 |> round
          nodes_topology_map = generate_line_topology(numNodes, :gossip)
          IO.puts("printing map #{inspect nodes_topology_map}")
          Enum.each(nodes_topology_map, fn {x, y} ->
@@ -56,27 +63,106 @@ defmodule Gossip do
          IO.puts("#{inspect(x)} knows the GOSSIP")
          GossipProtocol.tell_gossip(x)
          Enum.each(nodes_topology_map, fn {x,y} ->
-                                       GossipProtocol.start_gossip_protocol(x)
-                                       end)
-                                       [numNodes, "line", "pushsum"] ->
-                                         #start_time = :erlang.system_time / 1.0e6 |> round
-                                         nodes_topology_map = generate_line_topology(numNodes, :pushsum)
-                                         Enum.each(nodes_topology_map, fn {x,y} ->
-                                                                       PushSum.add_neighbours(x,y) end)
-                                         # Pick a random node and tell them gossip
-                                         {x,y} = Enum.random(nodes_topology_map)
-                                         #IO.puts("#{inspect(x)} knows the GOSSIP")
-                                         PushSum.start_push_sum(x)
-
+         GossipProtocol.start_gossip_protocol(x)
+         end)
+         receiver(0, numNodes, start_time)
+         [numNodes, "line", "pushsum"] ->
+        #start_time = :erlang.system_time / 1.0e6 |> round
+         nodes_topology_map = generate_line_topology(numNodes, :pushsum)
+         Enum.each(nodes_topology_map, fn {x,y} ->
+         PushSum.add_neighbours(x,y) end)
+         # Pick a random node and tell them gossip
+        {x,y} = Enum.random(nodes_topology_map)
+        #IO.puts("#{inspect(x)} knows the GOSSIP")
+        PushSum.start_push_sum(x)
+        [numNodes, "line", "gossip"] ->
+          start_time = :erlang.system_time / 1.0e6 |> round
+          nodes_topology_map = generate_line_topology(numNodes, :gossip)
+          IO.puts("printing map #{inspect nodes_topology_map}")
+          Enum.each(nodes_topology_map, fn {x, y} ->
+                                          GossipProtocol.add_neighbours(x,y) end)
+          # Pick a random node and tell them gossip
+          {x,y} = Enum.random(nodes_topology_map)
+          IO.puts("#{inspect(x)} knows the GOSSIP")
+          GossipProtocol.tell_gossip(x)
+          Enum.each(nodes_topology_map, fn {x,y} ->
+          GossipProtocol.start_gossip_protocol(x)
+          end)
+          receiver(0, numNodes, start_time)
+          [numNodes, "line", "pushsum"] ->
+         #start_time = :erlang.system_time / 1.0e6 |> round
+          nodes_topology_map = generate_line_topology(numNodes, :pushsum)
+          Enum.each(nodes_topology_map, fn {x,y} ->
+          PushSum.add_neighbours(x,y) end)
+          # Pick a random node and tell them gossip
+         {x,y} = Enum.random(nodes_topology_map)
+         #IO.puts("#{inspect(x)} knows the GOSSIP")
+         PushSum.start_push_sum(x)
+         [numNodes, "3D", "gossip"] ->
+           start_time = :erlang.system_time / 1.0e6 |> round
+           nodes_topology_map = generate_3D_grid(numNodes, :gossip)
+           IO.puts("printing map #{inspect nodes_topology_map}")
+           Enum.each(nodes_topology_map, fn {x, y} ->
+                                           GossipProtocol.add_neighbours(x,y) end)
+           # Pick a random node and tell them gossip
+           {x,y} = Enum.random(nodes_topology_map)
+           IO.puts("#{inspect(x)} knows the GOSSIP")
+           GossipProtocol.tell_gossip(x)
+           Enum.each(nodes_topology_map, fn {x,y} ->
+           GossipProtocol.start_gossip_protocol(x)
+           end
+           )
+           receiver(0, numNodes, start_time)
+           [numNodes, "3D", "pushsum"] ->
+          #start_time = :erlang.system_time / 1.0e6 |> round
+           nodes_topology_map = generate_3D_grid(numNodes, :pushsum)
+           Enum.each(nodes_topology_map, fn {x,y} ->
+           PushSum.add_neighbours(x,y) end)
+           # Pick a random node and tell them gossip
+          {x,y} = Enum.random(nodes_topology_map)
+          #IO.puts("#{inspect(x)} knows the GOSSIP")
+          PushSum.start_push_sum(x)
+          [numNodes, "sphere", "gossip"] ->
+            start_time = :erlang.system_time / 1.0e6 |> round
+            nodes_topology_map = form2Dgrid(numNodes, :gossip)
+            IO.puts("printing map #{inspect nodes_topology_map}")
+            Enum.each(nodes_topology_map, fn {x, y} ->
+                                            GossipProtocol.add_neighbours(x,y) end)
+            # Pick a random node and tell them gossip
+            {x,y} = Enum.random(nodes_topology_map)
+            IO.puts("#{inspect(x)} knows the GOSSIP")
+            GossipProtocol.tell_gossip(x)
+            Enum.each(nodes_topology_map, fn {x,y} ->
+            GossipProtocol.start_gossip_protocol(x)
+            end
+            )
+            receiver(0, numNodes, start_time)
+          [numNodes, "sphere", "pushsum"] ->
+         #start_time = :erlang.system_time / 1.0e6 |> round
+          nodes_topology_map = form2Dgrid(numNodes, :pushsum)
+          Enum.each(nodes_topology_map, fn {x,y} ->
+          PushSum.add_neighbours(x,y) end)
+          # Pick a random node and tell them gossip
+         {x,y} = Enum.random(nodes_topology_map)
+         #IO.puts("#{inspect(x)} knows the GOSSIP")
+         PushSum.start_push_sum(x)
     end
-
 
   end
 
-  def receiver() do
+  def receiver(counter, numNodes, start_time) do
     receive do
-      {:finished, pid} -> GossipProtocol.stop(pid)
+      {:ack, pid} ->
+         GossipProtocol.stop(pid)
+      percentage = (counter *100 / numNodes) |> :math.ceil() |> round
+      IO.puts("node #{counter+1} heard the rumour out of #{numNodes}")
+      if(counter >= numNodes-1) do
+        end_time = :erlang.system_time / 1.0e6 |> round
+        IO.puts "System converged in #{(end_time - start_time)} ms"
+        Process.exit(self(), "System converged in #{(end_time - start_time)} ms")
+      end
     end
+    receiver(counter+1, numNodes, start_time)
   end
 
   def generate_full_nodes_topology(numNodes, protocol) do
@@ -228,20 +314,59 @@ def generate_imperfect_line_topology(numNodes, protocol) do
   end
 end
 
+def form2Dgrid(numNodes, protocol) do
+    process_ok_tuples_list = create_server_list(numNodes, protocol)
+    nodes_list = Enum.map(process_ok_tuples_list, fn ({x,y}) -> y end)
+    dim = round(:math.ceil(:math.sqrt(numNodes)))
+    grid = Enum.chunk_every(nodes_list, dim)
+    neighborlist = []
+
+    map = Enum.reduce(0..dim*dim-1, %{}, fn (x, acc) ->
+        if x < numNodes do
+            i = round(:math.floor(x/dim)); j = rem(x, dim);
+            left = if j-1 < 0 do j-1 + length(Enum.at(grid, i)) else j-1 end
+            right = if j+1 >= length(Enum.at(grid, i)) do j+1 - length(Enum.at(grid, i)) else j+1 end
+            top = if i-1 < 0 do i - 1 + length(grid) else i-1 end
+            bottom = if i+1 >= length(grid) do i+1-length(grid)  else i+1 end
+            list =  _2DHelper([top, bottom, left, right], i, j, grid)
+            #IO.puts(inspect list)
+            #IO.inspect(acc)
+            Map.put(acc, Enum.at(nodes_list, x), list)
+        else
+          acc
+        end
+    end
+    )
+    map
+end
+
+def _2DHelper([top, bottom, left, right], i, j, grid) do
+    top    = Enum.at(Enum.at(grid, top), j)
+    bottom = Enum.at(Enum.at(grid, bottom), j)
+    left   = Enum.at(Enum.at(grid, i), left)
+    right  = Enum.at(Enum.at(grid, i), right)
+
+    #filtering out nil nodes
+    Enum.reduce([top, bottom, left, right], [], fn(x, l) ->
+        if x == nil do l else [x | l] end
+    end)
+end
+
   def generate_torus(numNodes, protocol) do
     process_ok_tuples_list = create_server_list(numNodes, protocol)
     nodes_list = Enum.map(process_ok_tuples_list, fn ({x,y}) -> y end)
-    dim = round(:math.ceil(:math.pow(numNodes, 1.0/3)))
+    dim = round(:math.floor(:math.pow(numNodes, 1.0/3)))
     IO.puts(dim)
     grid2D = Enum.chunk_every(nodes_list, dim)
     IO.puts(inspect(grid2D))
     grid3D = Enum.chunk_every(nodes_list, dim*dim)
     IO.puts(inspect(grid3D))
-    map = Enum.reduce(0..(dim*dim*dim-1), %{}, fn (x, acc) ->
+    map = Enum.reduce(0..dim*dim-1, %{}, fn (x, acc) ->
+        if x < numNodes do
         i = round(:math.floor(x/dim)); j = rem(x,dim); k = round(:math.floor(x/(dim*dim)))
         IO.puts("process = #{x} i = #{i}, j = #{j}, k = #{k}")
         x_left = if j-1 < 0 do j-1 + length(Enum.at(grid2D, i)) else j-1 end
-        x_right = if j+1 >= length(Enum.at(grid2D, i)) do j+1 - length(Enum.at(grid2D, i)) else j+1 end
+        x_right = if j+1 >= length(Enum.at(grid2D)) do j+1 - length(Enum.at(grid2D, i)) else j+1 end
         y_top = if i-1 < 0 do i - 1 + length(grid2D) else i-1 end
         y_bottom = if i+1 >= length(grid2D) do i+1-length(grid2D) else i+1 end
         z_top = if k-1 < 0 do k-1 + length(grid3D) else k-1 end
@@ -249,16 +374,18 @@ end
         IO.puts(inspect([y_top, y_bottom, z_top, z_bottom, x_left, x_right]))
         Map.put(acc, Enum.at(nodes_list, x),
           _2DHelper([y_top, y_bottom, z_top, z_bottom, x_left, x_right], i, j, k, dim, grid2D, grid3D)
-      )
-    end)
+            )
+      end
+    end
+    )
     map
   end
 
   def _2DHelper([y_top, y_bottom, z_top, z_bottom, left, right], i, j, k, dim,  grid2D, grid3D) do
-    y_top    = Enum.at(Enum.at(grid2D, y_top), j)
-    y_bottom = Enum.at(Enum.at(grid2D, y_bottom), j)
-    z_top = Enum.at(Enum.at(grid3D, z_top), i*dim + j)
-    z_bottom = Enum.at(Enum.at(grid3D, z_bottom), i*dim + j)
+    y_top    = if y_top >= 0 do Enum.at(Enum.at(grid2D, y_top), j) else nil end
+    y_bottom = if y_bottom <= Enum.at(grid2D)-1 do Enum.at(Enum.at(grid2D, y_bottom), j) end
+    z_top = Enum.at(Enum.at(grid3D, z_top), j*dim + i)
+    z_bottom = Enum.at(Enum.at(grid3D, z_bottom), j*dim + i)
     x_left   = Enum.at(Enum.at(grid2D, i), left)
     x_right  = Enum.at(Enum.at(grid2D, i), right)
 
@@ -279,10 +406,8 @@ def generate_3D(numNodes, protocol) do
    IO.puts(inspect(grid2D))
    grid = Enum.map(grid2D, fn x -> Enum.chunk_every(x, dim) end)
    map1 =
-     Enum.map(0..(dim-1), fn x ->
-       k = rem(x,dim)
-     Enum.reduce(0..(dim*dim-1), %{}, fn (x, acc) ->
-       i = round(:math.floor(x/dim)); j = rem(x, dim);
+     Enum.reduce(0..dim*dim*dim-1,%{}, fn x, acc ->
+       i = round(:math.floor(x/dim)); j = rem(x, dim); k = round(:math.floor(x/(dim*dim)))
        IO.puts("process = #{x} i = #{i}, j = #{j}, k = #{k}")
        x_left = j-1
        x_right = j+1
@@ -297,7 +422,6 @@ def generate_3D(numNodes, protocol) do
        final_list
       )
    end)
- end)
 end
 
 def _2DHelper1([y_top, y_bottom, z_top, z_bottom, x_left, x_right], i, j, k, grid) do
@@ -320,21 +444,41 @@ def _2DHelper1([y_top, y_bottom, z_top, z_bottom, x_left, x_right], i, j, k, gri
   end)
 end
 
-def generate_3D_grid(numNodes,protocol ) do
-  process_ok_tuples_list = create_server_list(numNodes, protocol)
-  nodes_list = Enum.map(process_ok_tuples_list, fn ({x,y}) -> y end)
-
+def generate_3D_grid(numNodes, :gossip) do
+  #process_ok_tuples_list = create_server_list(numNodes, protocol)
+  #nodes_list = Enum.map(process_ok_tuples_list, fn ({x,y}) -> y end)
   dim = round(:math.ceil(:math.pow(numNodes, 1.0/3)))
-  #IO.puts("dim #{dim}")
-  #grid2D = Enum.chunk_every(nodes_list, dim*dim)
-  #IO.puts(inspect(grid2D))
-  #row = Enum.chunk_every(grid2D, dim)
-  #IO.puts(inspect(row))
-
   map1 = Enum.reduce(0..dim-1, %{}, fn(i,acc) ->
           Enum.reduce(0..dim-1, acc, fn(row,acc) ->
             Enum.reduce(0..dim-1, acc, fn(col,acc) ->
                 {:ok, pid} = GossipProtocol.start_link(numNodes, self())
+                Map.put(acc,{i,row,col},pid)
+        end)
+     end)
+  end)
+IO.inspect( map1)
+  map2 = Enum.reduce(map1, %{}, fn ({{x,y,z}, pid}, acc) ->
+                          list = []
+                            list = Enum.concat(list,[Map.get(map1,{x+1, y, z})])
+                            list = Enum.concat(list,[Map.get(map1,{x-1, y, z})])
+                            list = Enum.concat(list,[Map.get(map1,{x, y+1, z})])
+                            list = Enum.concat(list,[Map.get(map1, {x, y-1, z})])
+                            list = Enum.concat(list,[Map.get(map1, {x, y, z+1})])
+                            list = Enum.concat(list,[Map.get(map1, {x, y, z-1})])
+                            list = Enum.filter(list, & !is_nil(&1))
+                            Map.put(acc, pid, list)
+              end)
+  map2
+end
+
+def generate_3D_grid(numNodes, :pushsum) do
+  #process_ok_tuples_list = create_server_list(numNodes, protocol)
+  #nodes_list = Enum.map(process_ok_tuples_list, fn ({x,y}) -> y end)
+  dim = round(:math.ceil(:math.pow(numNodes, 1.0/3)))
+  map1 = Enum.reduce(0..dim-1, %{}, fn(i,acc) ->
+          Enum.reduce(0..dim-1, acc, fn(row,acc) ->
+            Enum.reduce(0..dim-1, acc, fn(col,acc) ->
+                {:ok, pid} = {:ok, pid} = PushSum.start_link(numNodes, col*(dim*dim)+ row*dim+i+1, self())
                 Map.put(acc,{i,row,col},pid)
         end)
      end)
@@ -393,11 +537,11 @@ end
 
 defmodule GossipProtocol do
   use GenServer
-
+  @start_time :erlang.system_time / 1.0e6 |> round
   def start_link(numNodes, parent_id) do
     import :math
     {numRound, _} = Integer.parse(Float.to_string((log2(numNodes))))
-    GenServer.start_link(__MODULE__, {false, [], numRound, parent_id})
+    GenServer.start_link(__MODULE__, {false, [], 5, parent_id})
   end
 
   ## add neighbors based on the topology
@@ -415,7 +559,7 @@ defmodule GossipProtocol do
   end
   # Server @callback function_name() :: type
     def init(state) do
-      IO.puts(inspect(state))
+    #  IO.puts(inspect(state))
       {:ok, state}
     end
 
@@ -438,7 +582,7 @@ defmodule GossipProtocol do
       if knows_gossip == true do
         #random_number = :rand.uniform(length(neighbors_list))
         random_neighbour = Enum.random(neighbors_list)
-        IO.puts("#{inspect(random_neighbour)} chosen by #{inspect(self())} ")
+      #  IO.puts("Process: #{inspect(self())} tells the gossip to Process: #{inspect(random_neighbour)}")
         send(random_neighbour, {:send_gossip_to_neighbor})
         start_gossip_protocol(self())
       # else wait for the gossip to come
@@ -451,8 +595,10 @@ defmodule GossipProtocol do
       {bool, initial_neighbors_list, numRound, parent_id} = state
       if numRound == 0 do
         #IO.puts("")
-        IO.puts("stop the process #{inspect(self())} and state during ending #{inspect(state)}")
-        Process.exit(self(), :finished)
+      #  IO.puts("stop the process #{inspect(self())} and state during ending #{inspect(state)}")
+        #IO.puts "System converged in #{(end_time - @start_time)} ms"
+        #Process.exit(self(), "System converged in #{(end_time - @start_time)} ms")
+        send(parent_id, {:ack, self()})
         #GossipProtocol.stop()
         #terminate(:finished, state)
         #stop(self(), :normal, :infinity) #reason \\ :normal, timeout \\ :infinity)
@@ -538,6 +684,8 @@ defmodule PushSum do
     diff = (old_ratio - new_ratio)*(old_ratio - new_ratio) |> :math.sqrt
     if( diff < @accuracy) do
       IO.puts("The PathSum converged on the avg #{new_ratio}")
+      end_time = :erlang.system_time / 1.0e6 |> round
+      IO.puts "System converged in #{(end_time - @start_time)} ms"
       Process.exit(self(), :finished)
     end
     new_state = {{new_sum , new_weight} , initial_neighbors_list, numRound, parent_id}
